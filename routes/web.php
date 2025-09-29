@@ -14,16 +14,16 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Dashboard Routes
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
 // Dashboard Component Routes
-Route::get('/dashboard/overview', [DashboardController::class, 'overview'])->name('dashboard.overview');
-Route::get('/dashboard/products', [DashboardController::class, 'products'])->name('dashboard.products');
-Route::get('/dashboard/portfolio', [DashboardController::class, 'portfolio'])->name('dashboard.portfolio');
-Route::get('/dashboard/orders', [DashboardController::class, 'orders'])->name('dashboard.orders');
+Route::get('/dashboard/networks', [DashboardController::class, 'networks'])->name('dashboard.networks');
+Route::get('/dashboard/transactions', [DashboardController::class, 'transactions'])->name('dashboard.transactions');
+Route::get('/dashboard/customers', [DashboardController::class, 'customers'])->name('dashboard.customers');
+Route::get('/dashboard/reports', [DashboardController::class, 'reports'])->name('dashboard.reports');
 Route::get('/dashboard/analytics', [DashboardController::class, 'analytics'])->name('dashboard.analytics');
 Route::get('/dashboard/settings', [DashboardController::class, 'settings'])->name('dashboard.settings');
-Route::get('/dashboard/networks', [DashboardController::class, 'networks'])->name('dashboard.networks');
+Route::get('/dashboard/inventory', [DashboardController::class, 'inventory'])->name('dashboard.inventory');
 
 // Business switching route
 Route::post('/dashboard/switch-business', [DashboardController::class, 'switchBusiness'])->name('dashboard.switch-business');

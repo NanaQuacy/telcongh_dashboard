@@ -15,71 +15,15 @@ class DashboardController extends Controller
     }
 
     /**
-     * Redirect to overview page
+     * Show the main dashboard page
      */
     public function index()
     {
-        return redirect('/dashboard/overview');
-    }
-
-    /**
-     * Show the overview page
-     */
-    public function overview()
-    {
         if (!$this->checkAuthService->checkAuth()) {
             return redirect('/login');
         }
 
-        return view('dashboard.overview');
-    }
-
-    /**
-     * Show the products page
-     */
-    public function products()
-    {
-        if (!$this->checkAuthService->checkAuth()) {
-            return redirect('/login');
-        }
-
-        return view('dashboard.products');
-    }
-
-    /**
-     * Show the portfolio page
-     */
-    public function portfolio()
-    {
-        if (!$this->checkAuthService->checkAuth()) {
-            return redirect('/login');
-        }
-
-        return view('dashboard.portfolio');
-    }
-
-    /**
-     * Show the orders page
-     */
-    public function orders()
-    {
-        if (!$this->checkAuthService->checkAuth()) {
-            return redirect('/login');
-        }
-
-        return view('dashboard.orders');
-    }
-
-    /**
-     * Show the analytics page
-     */
-    public function analytics()
-    {
-        if (!$this->checkAuthService->checkAuth()) {
-            return redirect('/login');
-        }
-
-        return view('dashboard.analytics');
+        return view('dashboard.index');
     }
 
     /**
@@ -92,6 +36,54 @@ class DashboardController extends Controller
         }
 
         return view('dashboard.networks');
+    }
+
+    /**
+     * Show the transactions page
+     */
+    public function transactions()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.transactions');
+    }
+
+    /**
+     * Show the customers page
+     */
+    public function customers()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.customers');
+    }
+
+    /**
+     * Show the reports page
+     */
+    public function reports()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.reports');
+    }
+
+    /**
+     * Show the analytics page
+     */
+    public function analytics()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.analytics');
     }
 
     /**
@@ -137,5 +129,17 @@ class DashboardController extends Controller
             'message' => 'Business switched successfully',
             'business' => $selectedBusiness
         ]);
+    }
+
+    /**
+     * Show the inventory page
+     */
+    public function inventory()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.inventory');
     }
 }

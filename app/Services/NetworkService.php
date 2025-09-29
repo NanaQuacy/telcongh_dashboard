@@ -6,9 +6,19 @@ use App\Http\Integrations\TelconApiConnector;
 use App\Http\Integrations\Requests\NetworkRequest;
 use App\Http\Integrations\Requests\NetworkServicesRequest;
 use App\Http\Integrations\Requests\NetworkServicePricingRequest;
+use App\Http\Integrations\Requests\ActiveNetworkServicesRequest;
+use App\Http\Integrations\Requests\CreateNetworkServicePricingRequest;
+use App\Http\Integrations\Requests\StockBatchesByBusinessRequest;
+use App\Http\Integrations\Requests\CreateStockBatchRequest;
+use App\Http\Integrations\Requests\CreateStockItemRequest;
 use App\Http\Integrations\Data\NetworkResponse;
 use App\Http\Integrations\Data\NetworkServicesResponse;
 use App\Http\Integrations\Data\NetworkServicePricingResponse;
+use App\Http\Integrations\Data\ActiveNetworkServicesResponse;
+use App\Http\Integrations\Data\CreateNetworkServicePricingResponse;
+use App\Http\Integrations\Data\StockBatchesResponse;
+use App\Http\Integrations\Data\CreateStockBatchResponse;
+use App\Http\Integrations\Data\CreateStockItemResponse;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
 
@@ -268,6 +278,371 @@ class NetworkService
                 message: 'Network service pricing request failed. Please try again.',
                 data: null,
                 errors: ['network' => 'Unable to connect to network service pricing service']
+            );
+        }
+    }
+
+    /**
+     * Get active network services
+     */
+    public function getActiveNetworkServices(): ActiveNetworkServicesResponse
+    {
+        try {
+            $token = Session::get('auth_token');
+            
+            if (!$token) {
+                Log::warning('No auth token found for active network services request');
+                return new ActiveNetworkServicesResponse(
+                    success: false,
+                    message: 'Authentication token not found',
+                    data: null,
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+            
+            $request = new ActiveNetworkServicesRequest($token);
+            
+            Log::info('Making active network services request', [
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'has_token' => !empty($token)
+            ]);
+            
+            $response = $this->connector->send($request);
+            
+            Log::info('Active Network Services API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->body(),
+                'headers' => $response->headers()
+            ]);
+            
+            $servicesResponse = ActiveNetworkServicesResponse::fromResponse($response);
+            
+            if ($servicesResponse->isSuccessful()) {
+                Log::info('Active network services retrieved successfully', [
+                    'services_count' => count($servicesResponse->getServices())
+                ]);
+            } else {
+                Log::warning('Failed to retrieve active network services', [
+                    'errors' => $servicesResponse->getErrors(),
+                    'response_status' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+            }
+            
+            return $servicesResponse;
+            
+        } catch (\Exception $e) {
+            Log::error('Active network services request failed', [
+                'error' => $e->getMessage()
+            ]);
+            
+            return new ActiveNetworkServicesResponse(
+                success: false,
+                message: 'Active network services request failed. Please try again.',
+                data: null,
+                errors: ['network' => 'Unable to connect to active network services service']
+            );
+        }
+    }
+
+    /**
+     * Create or update network service pricing
+     */
+    public function createNetworkServicePricing(int $networkServiceId, int $businessId, float $costPrice, float $sellingPrice): CreateNetworkServicePricingResponse
+    {
+        try {
+            $token = Session::get('auth_token');
+            
+            if (!$token) {
+                Log::warning('No auth token found for create network service pricing request');
+                return new CreateNetworkServicePricingResponse(
+                    success: false,
+                    message: 'Authentication token not found',
+                    data: null,
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+            
+            $request = new CreateNetworkServicePricingRequest($token, $networkServiceId, $businessId, $costPrice, $sellingPrice);
+            
+            Log::info('Making create network service pricing request', [
+                'network_service_id' => $networkServiceId,
+                'business_id' => $businessId,
+                'cost_price' => $costPrice,
+                'selling_price' => $sellingPrice,
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'has_token' => !empty($token)
+            ]);
+            
+            $response = $this->connector->send($request);
+            
+            Log::info('Create Network Service Pricing API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->body(),
+                'headers' => $response->headers()
+            ]);
+            
+            $pricingResponse = CreateNetworkServicePricingResponse::fromResponse($response);
+            
+            if ($pricingResponse->isSuccessful()) {
+                Log::info('Network service pricing created/updated successfully', [
+                    'pricing_id' => $pricingResponse->getPricingId(),
+                    'network_service_id' => $networkServiceId,
+                    'business_id' => $businessId
+                ]);
+            } else {
+                Log::warning('Failed to create/update network service pricing', [
+                    'errors' => $pricingResponse->getErrors(),
+                    'response_status' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+            }
+            
+            return $pricingResponse;
+            
+        } catch (\Exception $e) {
+            Log::error('Create network service pricing request failed', [
+                'network_service_id' => $networkServiceId,
+                'business_id' => $businessId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return new CreateNetworkServicePricingResponse(
+                success: false,
+                message: 'Create network service pricing request failed. Please try again.',
+                data: null,
+                errors: ['network' => 'Unable to connect to create network service pricing service']
+            );
+        }
+    }
+
+    /**
+     * Get stock batches by business
+     */
+    public function getStockBatchesByBusiness(int $businessId): StockBatchesResponse
+    {
+        try {
+            $token = Session::get('auth_token');
+            
+            if (!$token) {
+                Log::warning('No auth token found for stock batches request');
+                return new StockBatchesResponse(
+                    success: false,
+                    message: 'Authentication token not found',
+                    data: null,
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+            
+            $request = new StockBatchesByBusinessRequest($token, $businessId);
+            
+            Log::info('Making stock batches request', [
+                'business_id' => $businessId,
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'has_token' => !empty($token)
+            ]);
+            
+            $response = $this->connector->send($request);
+            
+            Log::info('Stock Batches API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->body(),
+                'headers' => $response->headers()
+            ]);
+            
+            $batchesResponse = StockBatchesResponse::fromResponse($response);
+            
+            if ($batchesResponse->isSuccessful()) {
+                Log::info('Stock batches retrieved successfully', [
+                    'batches_count' => count($batchesResponse->getBatches())
+                ]);
+            } else {
+                Log::warning('Failed to retrieve stock batches', [
+                    'errors' => $batchesResponse->getErrors(),
+                    'response_status' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+            }
+            
+            return $batchesResponse;
+            
+        } catch (\Exception $e) {
+            Log::error('Stock batches request failed', [
+                'business_id' => $businessId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return new StockBatchesResponse(
+                success: false,
+                message: 'Stock batches request failed. Please try again.',
+                data: null,
+                errors: ['network' => 'Unable to connect to stock batches service']
+            );
+        }
+    }
+
+    /**
+     * Create stock batch
+     */
+    public function createStockBatch(
+        string $name,
+        string $description,
+        string $boxBatchNumber,
+        string $startingIccid,
+        string $endingIccid,
+        int $quantity,
+        float $cost,
+        int $businessId
+    ): CreateStockBatchResponse {
+        try {
+            $token = Session::get('auth_token');
+            
+            if (!$token) {
+                Log::warning('No auth token found for create stock batch request');
+                return new CreateStockBatchResponse(
+                    success: false,
+                    message: 'Authentication token not found',
+                    data: null,
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+            
+            $request = new CreateStockBatchRequest(
+                $token,
+                $name,
+                $description,
+                $boxBatchNumber,
+                $startingIccid,
+                $endingIccid,
+                $quantity,
+                $cost,
+                $businessId
+            );
+            
+            Log::info('Making create stock batch request', [
+                'name' => $name,
+                'quantity' => $quantity,
+                'cost' => $cost,
+                'business_id' => $businessId,
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'has_token' => !empty($token)
+            ]);
+            
+            $response = $this->connector->send($request);
+            
+            Log::info('Create Stock Batch API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->body(),
+                'headers' => $response->headers()
+            ]);
+            
+            $batchResponse = CreateStockBatchResponse::fromResponse($response);
+            
+            if ($batchResponse->isSuccessful()) {
+                Log::info('Stock batch created successfully', [
+                    'batch_id' => $batchResponse->getBatchId(),
+                    'name' => $name,
+                    'business_id' => $businessId
+                ]);
+            } else {
+                Log::warning('Failed to create stock batch', [
+                    'errors' => $batchResponse->getErrors(),
+                    'response_status' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+            }
+            
+            return $batchResponse;
+            
+        } catch (\Exception $e) {
+            Log::error('Create stock batch request failed', [
+                'name' => $name,
+                'business_id' => $businessId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return new CreateStockBatchResponse(
+                success: false,
+                message: 'Create stock batch request failed. Please try again.',
+                data: null,
+                errors: ['network' => 'Unable to connect to create stock batch service']
+            );
+        }
+    }
+
+    /**
+     * Create stock items
+     */
+    public function createStockItems(int $stockBatchId, string $serialNumbers): CreateStockItemResponse
+    {
+        try {
+            $token = Session::get('auth_token');
+            
+            if (!$token) {
+                Log::warning('No auth token found for create stock items request');
+                return new CreateStockItemResponse(
+                    success: false,
+                    message: 'Authentication token not found',
+                    data: null,
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+            
+            $request = new CreateStockItemRequest($token, $stockBatchId, $serialNumbers);
+            
+            Log::info('Making create stock items request', [
+                'stock_batch_id' => $stockBatchId,
+                'serial_numbers_length' => strlen($serialNumbers),
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'has_token' => !empty($token)
+            ]);
+            
+            $response = $this->connector->send($request);
+            
+            Log::info('Create Stock Items API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->body(),
+                'headers' => $response->headers()
+            ]);
+            
+            $itemsResponse = CreateStockItemResponse::fromResponse($response);
+            
+            if ($itemsResponse->isSuccessful()) {
+                Log::info('Stock items created successfully', [
+                    'stock_batch_id' => $stockBatchId,
+                    'items_count' => $itemsResponse->getItemsCount()
+                ]);
+            } else {
+                Log::warning('Failed to create stock items', [
+                    'errors' => $itemsResponse->getErrors(),
+                    'response_status' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+            }
+            
+            return $itemsResponse;
+            
+        } catch (\Exception $e) {
+            Log::error('Create stock items request failed', [
+                'stock_batch_id' => $stockBatchId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return new CreateStockItemResponse(
+                success: false,
+                message: 'Create stock items request failed. Please try again.',
+                data: null,
+                errors: ['network' => 'Unable to connect to create stock items service']
             );
         }
     }
