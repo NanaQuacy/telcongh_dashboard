@@ -38,6 +38,7 @@ class CreateStockBatchRequest extends Request implements HasBody
             'quantity' => $this->quantity,
             'cost' => $this->cost,
             'business_id' => $this->businessId,
+            'network_id' => $this->networkId,
         ];
     }
 
@@ -50,7 +51,8 @@ class CreateStockBatchRequest extends Request implements HasBody
         public string $endingIccid,
         public int $quantity,
         public float $cost,
-        public int $businessId
+        public int $businessId,
+        public string $networkId
     ) {
         //
     }

@@ -498,7 +498,8 @@ class NetworkService
         string $endingIccid,
         int $quantity,
         float $cost,
-        int $businessId
+        int $businessId,
+        string $networkId
     ): CreateStockBatchResponse {
         try {
             $token = Session::get('auth_token');
@@ -522,7 +523,8 @@ class NetworkService
                 $endingIccid,
                 $quantity,
                 $cost,
-                $businessId
+                $businessId,
+                $networkId
             );
             
             Log::info('Making create stock batch request', [
@@ -530,6 +532,7 @@ class NetworkService
                 'quantity' => $quantity,
                 'cost' => $cost,
                 'business_id' => $businessId,
+                'network_id' => $networkId,
                 'endpoint' => $request->resolveEndpoint(),
                 'method' => $request->getMethod()->value,
                 'has_token' => !empty($token)
@@ -566,6 +569,7 @@ class NetworkService
             Log::error('Create stock batch request failed', [
                 'name' => $name,
                 'business_id' => $businessId,
+                'network_id' => $networkId,
                 'error' => $e->getMessage()
             ]);
             

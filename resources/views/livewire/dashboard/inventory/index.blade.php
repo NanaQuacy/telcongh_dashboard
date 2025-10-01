@@ -10,6 +10,11 @@ new class extends Component {
     public $batchesError = '';
     public $businessId = null;
     
+    // Networks for dropdown
+    public $networks = [];
+    public $networksLoaded = false;
+    public $networksError = '';
+    
     // Batch creation form
     public $showCreateBatchForm = false;
     public $batchName = '';
@@ -19,6 +24,7 @@ new class extends Component {
     public $endingIccid = '';
     public $quantity = '';
     public $cost = '';
+    public $selectedNetworkId = '';
     
     // Stock items creation
     public $showCreateItemsForm = false;
@@ -39,6 +45,7 @@ new class extends Component {
         'endingIccid' => 'required|string',
         'quantity' => 'required|integer|min:1',
         'cost' => 'required|numeric|min:0',
+        'selectedNetworkId' => 'required|string',
         'serialNumbers' => 'required|string|min:1',
     ];
     
@@ -46,6 +53,7 @@ new class extends Component {
         $selectedBusiness = session('selected_business');
         $this->businessId = is_array($selectedBusiness) ? ($selectedBusiness['id'] ?? null) : null;
         $this->loadBatches();
+        $this->loadNetworks();
     }
     
     public function loadBatches() {
@@ -70,6 +78,25 @@ new class extends Component {
         } catch (\Exception $e) {
             $this->batchesError = 'Failed to load stock batches: ' . $e->getMessage();
             $this->batchesLoaded = false;
+        }
+    }
+    
+    public function loadNetworks() {
+        try {
+            $networkService = new NetworkService(new TelconApiConnector());
+            $response = $networkService->getAllNetworks();
+            
+            if ($response->isSuccessful()) {
+                $this->networks = $response->getNetworks();
+                $this->networksLoaded = true;
+                $this->networksError = '';
+            } else {
+                $this->networksError = $response->getMessage();
+                $this->networksLoaded = false;
+            }
+        } catch (\Exception $e) {
+            $this->networksError = 'Failed to load networks: ' . $e->getMessage();
+            $this->networksLoaded = false;
         }
     }
     
@@ -126,6 +153,7 @@ new class extends Component {
             'endingIccid' => 'required|string',
             'quantity' => 'required|integer|min:1',
             'cost' => 'required|numeric|min:0',
+            'selectedNetworkId' => 'required|string',
         ]);
         
         if (!$this->businessId) {
@@ -143,7 +171,8 @@ new class extends Component {
                 $this->endingIccid,
                 (int) $this->quantity,
                 (float) $this->cost,
-                $this->businessId
+                $this->businessId,
+                $this->selectedNetworkId
             );
             
             if ($response->isSuccessful()) {
@@ -217,6 +246,7 @@ new class extends Component {
         $this->endingIccid = '';
         $this->quantity = '';
         $this->cost = '';
+        $this->selectedNetworkId = '';
         $this->resetErrorBag();
     }
     
@@ -228,6 +258,7 @@ new class extends Component {
     
     public function refreshData() {
         $this->loadBatches();
+        $this->loadNetworks();
     }
     
     public function getSelectedBatch() {
@@ -348,6 +379,7 @@ new class extends Component {
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                             <tr>
                                 <th class="px-8 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Batch Info</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Network</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Box Details</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">ICCID Range</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Quantity</th>
@@ -371,6 +403,20 @@ new class extends Component {
                                                 <div class="text-sm text-gray-500 max-w-xs truncate">{{ $batch['description'] ?? 'No description' }}</div>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td class="px-6 py-6 whitespace-nowrap">
+                                        @if(isset($batch['network']) && $batch['network'])
+                                            <div class="flex items-center">
+                                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: {{ $batch['network']['color_code'] ?? '#6B7280' }}"></div>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white border" style="background-color: {{ $batch['network']['color_code'] ?? '#6B7280' }}">
+                                                    {{ $batch['network']['name'] ?? 'Unknown' }}
+                                                </span>
+                                            </div>
+                                        @else
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                                No Network
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-6 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900">{{ $batch['box_batch_number'] ?? 'N/A' }}</div>
@@ -568,6 +614,25 @@ new class extends Component {
                                        class="mt-1 p-4 block w-full border-2 border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all duration-200 hover:border-gray-300"
                                        placeholder="0.00" required>
                                 @error('cost') <span class="text-red-500 text-sm mt-1 block">{{ $message }}</span> @enderror
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label for="selected_network_id" class="block text-sm font-semibold text-gray-700 mb-2">Network</label>
+                                <select id="selected_network_id" wire:model="selectedNetworkId" 
+                                        class="mt-1 p-4 block w-full border-2 border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all duration-200 hover:border-gray-300" required>
+                                    <option value="">Select a network</option>
+                                    @if($networksLoaded && count($networks) > 0)
+                                        @foreach($networks as $network)
+                                            <option value="{{ $network['id'] ?? $network['network_id'] ?? '' }}">
+                                                {{ $network['name'] ?? $network['network_name'] ?? 'Unknown Network' }}
+                                            </option>
+                                        @endforeach
+                                    @endif
+                                </select>
+                                @error('selectedNetworkId') <span class="text-red-500 text-sm mt-1 block">{{ $message }}</span> @enderror
+                                @if($networksError)
+                                    <span class="text-red-500 text-sm mt-1 block">{{ $networksError }}</span>
+                                @endif
                             </div>
                         </div>
                         
