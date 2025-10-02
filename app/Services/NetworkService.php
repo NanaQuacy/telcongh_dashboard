@@ -11,6 +11,7 @@ use App\Http\Integrations\Requests\CreateNetworkServicePricingRequest;
 use App\Http\Integrations\Requests\StockBatchesByBusinessRequest;
 use App\Http\Integrations\Requests\CreateStockBatchRequest;
 use App\Http\Integrations\Requests\CreateStockItemRequest;
+use App\Http\Integrations\Requests\SimVerificationRequest;
 use App\Http\Integrations\Data\NetworkResponse;
 use App\Http\Integrations\Data\NetworkServicesResponse;
 use App\Http\Integrations\Data\NetworkServicePricingResponse;
@@ -19,6 +20,7 @@ use App\Http\Integrations\Data\CreateNetworkServicePricingResponse;
 use App\Http\Integrations\Data\StockBatchesResponse;
 use App\Http\Integrations\Data\CreateStockBatchResponse;
 use App\Http\Integrations\Data\CreateStockItemResponse;
+use App\Http\Integrations\Data\SimVerificationResponse;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
 
@@ -647,6 +649,62 @@ class NetworkService
                 message: 'Create stock items request failed. Please try again.',
                 data: null,
                 errors: ['network' => 'Unable to connect to create stock items service']
+            );
+        }
+    }
+
+    /**
+     * Verify SIM card serial number
+     */
+    public function verifySimCard(string $simSerialNumber, int $businessId): SimVerificationResponse
+    {
+        try {
+            $token = Session::get('auth_token');
+            if (!$token) {
+                Log::warning('No auth token found for SIM verification request');
+                return new SimVerificationResponse(
+                    success: false,
+                    isValid: false,
+                    message: 'Authentication token not found',
+                    errors: ['auth' => 'Authentication token not found']
+                );
+            }
+
+            $request = new SimVerificationRequest($token, $simSerialNumber, $businessId);
+            
+            Log::info('Making SIM verification request', [
+                'endpoint' => $request->resolveEndpoint(),
+                'method' => $request->getMethod()->value,
+                'serial_numbers' => $simSerialNumber,
+                'business_id' => $businessId,
+                'business_id_type' => gettype($businessId),
+                'body' => $request->body(),
+                'headers' => $request->headers()
+            ]);
+
+            $response = $this->connector->send($request);
+            
+            Log::info('SIM verification response received', [
+                'status' => $response->status(),
+                'success' => $response->successful(),
+                'body' => $response->body(),
+                'json' => $response->json()
+            ]);
+
+            return SimVerificationResponse::fromResponse($response);
+
+        } catch (\Exception $e) {
+            Log::error('SIM verification request failed', [
+                'sim_serial_number' => $simSerialNumber,
+                'business_id' => $businessId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return new SimVerificationResponse(
+                success: false,
+                isValid: false,
+                message: 'SIM verification request failed. Please try again.',
+                errors: ['network' => 'Unable to connect to SIM verification service']
             );
         }
     }

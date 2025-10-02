@@ -12,6 +12,7 @@ new class extends Component {
     public $serviceLoaded = false;
     public $serviceError = '';
     public $selectedServiceId = null;
+    public $businessId = null;
     
     // Step management
     public $currentStep = 1;
@@ -19,6 +20,8 @@ new class extends Component {
     // Step 1: SIM Verification
     public $simSerial = '';
     public $phoneNumber = '';
+    public $simVerificationStatus = null; // null, 'verifying', 'verified', 'failed'
+    public $simVerificationMessage = '';
     
     // Step 2: Customer Details
     public $firstName = '';
@@ -34,8 +37,8 @@ new class extends Component {
     public $confirmDetails = false;
     
     protected $rules = [
-        'simSerial' => 'required|string|min:10',
-        'phoneNumber' => 'required|string|min:10',
+        'simSerial' => 'required|string|min:10|size:10',
+        'phoneNumber' => 'required|string|min:10|size:10',
         'firstName' => 'required|string|min:2',
         'lastName' => 'required|string|min:2',
         'email' => 'nullable|email',
@@ -47,6 +50,8 @@ new class extends Component {
     
     public function mount() {
         $this->selectedServiceId = session('selected_service');
+        $selectedBusiness = session('selected_business');
+        $this->businessId = is_array($selectedBusiness) ? ($selectedBusiness['id'] ?? null) : null;
         
         if ($this->selectedServiceId) {
             $this->loadServiceData();
@@ -129,6 +134,53 @@ new class extends Component {
     
     public function goBack() {
         return redirect()->route('dashboard.networks');
+    }
+    
+    public function verifySimCard() {
+        $this->validate([
+            'simSerial' => 'required|string|min:10',
+        ]);
+        
+        if (!$this->businessId) {
+            $this->simVerificationStatus = 'failed';
+            $this->simVerificationMessage = 'No business selected. Please select a business first.';
+            return;
+        }
+        
+        $this->simVerificationStatus = 'verifying';
+        $this->simVerificationMessage = '';
+        
+        try {
+            $networkService = new NetworkService(new TelconApiConnector());
+            $response = $networkService->verifySimCard($this->simSerial, $this->businessId);
+            
+            if ($response->isSuccessful()) {
+                if ($response->isValid()) {
+                    // Check if SIM is available for use
+                    if ($response->isAvailable() === true) {
+                        $this->simVerificationStatus = 'verified';
+                        $this->simVerificationMessage = 'SIM card verified and available for use';
+                    } elseif ($response->isAvailable() === false) {
+                        $this->simVerificationStatus = 'failed';
+                        $this->simVerificationMessage = $response->getDisplayMessage();
+                    } else {
+                        // Fallback if availability status is not provided
+                        $this->simVerificationStatus = 'verified';
+                        $this->simVerificationMessage = $response->getDisplayMessage();
+                    }
+                } else {
+                    $this->simVerificationStatus = 'failed';
+                    $this->simVerificationMessage = $response->getDisplayMessage();
+                }
+            } else {
+                $this->simVerificationStatus = 'failed';
+                $this->simVerificationMessage = $response->getMessage() ?? 'Verification failed';
+            }
+            
+        } catch (\Exception $e) {
+            $this->simVerificationStatus = 'failed';
+            $this->simVerificationMessage = 'Verification failed: ' . $e->getMessage();
+        }
     }
 }; ?>
 
@@ -258,10 +310,50 @@ new class extends Component {
                             <div class="space-y-6">
                                 <div>
                                     <label for="sim_serial" class="block text-sm font-semibold text-gray-700 mb-2">SIM Card Serial Number</label>
-                                    <input type="text" id="sim_serial" wire:model="simSerial" 
-                                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                           placeholder="Enter SIM card serial number" required>
+                                    <div class="flex gap-3">
+                                        <input type="text" id="sim_serial" wire:model="simSerial" 
+                                               class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                                               placeholder="Enter SIM card serial number" required>
+                                        <button type="button" wire:click="verifySimCard" 
+                                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                @if($simVerificationStatus === 'verifying') disabled @endif>
+                                            @if($simVerificationStatus === 'verifying')
+                                                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                </svg>
+                                            @else
+                                                Verify
+                                            @endif
+                                        </button>
+                                    </div>
                                     @error('simSerial') <span class="text-red-500 text-sm mt-1 block">{{ $message }}</span> @enderror
+                                    
+                                    <!-- Verification Result -->
+                                    @if($simVerificationStatus)
+                                        <div class="mt-3 p-3 rounded-lg border
+                                            @if($simVerificationStatus === 'verified') bg-green-50 border-green-200 @endif
+                                            @if($simVerificationStatus === 'failed') bg-red-50 border-red-200 @endif
+                                            @if($simVerificationStatus === 'verifying') bg-blue-50 border-blue-200 @endif">
+                                            <div class="flex items-center">
+                                                @if($simVerificationStatus === 'verified')
+                                                    <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    <span class="text-sm font-medium text-green-800">{{ $simVerificationMessage }}</span>
+                                                @elseif($simVerificationStatus === 'failed')
+                                                    <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    <span class="text-sm font-medium text-red-800">{{ $simVerificationMessage }}</span>
+                                                @elseif($simVerificationStatus === 'verifying')
+                                                    <svg class="w-5 h-5 text-blue-600 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                    </svg>
+                                                    <span class="text-sm font-medium text-blue-800">Verifying SIM card...</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div>
                                     <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
