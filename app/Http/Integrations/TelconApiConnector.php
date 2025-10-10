@@ -3,18 +3,17 @@
 namespace App\Http\Integrations;
 
 use Saloon\Http\Connector;
-use Saloon\Traits\Plugins\AcceptsJson;
 
 class TelconApiConnector extends Connector
 {
-    use AcceptsJson;
 
     /**
      * The base URL of the API
      */
     public function resolveBaseUrl(): string
     {
-        return config('services.telcon.base_url', env('TELCON_API_BASE_URL', 'https://api.telcon.com/v1'));
+        $baseUrl = config('services.telcon.base_url', env('TELCON_API_BASE_URL', 'https://api.telcon.com/v1'));
+        return rtrim($baseUrl, '/');
     }
 
     /**
@@ -23,7 +22,6 @@ class TelconApiConnector extends Connector
     protected function defaultHeaders(): array
     {
         $headers = [
-            'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
 
