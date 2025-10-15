@@ -3,6 +3,7 @@
 use Livewire\Volt\Component;
 use App\Services\NetworkService;
 use App\Http\Integrations\TelconApiConnector;
+use App\Http\Integrations\Requests\UpdateSimCardStatusRequest;
 
 new class extends Component {
     public $batches = [];
@@ -264,6 +265,73 @@ new class extends Component {
     public function getSelectedBatch() {
         if (!$this->selectedBatchId) return null;
         return collect($this->batches)->firstWhere('id', $this->selectedBatchId);
+    }
+
+    public function toggleSimActive($itemId, $isActive) {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+            
+            if (!$token) {
+                session()->flash('error', 'Authentication token not found. Please log in again.');
+                return;
+            }
+            
+            $request = new UpdateSimCardStatusRequest(
+                token: $token,
+                itemId: $itemId,
+                status: 'is_active',
+                value: $isActive === 'true'
+            );
+            
+            $response = $connector->send($request);
+            
+            if ($response->successful()) {
+                $status = $isActive === 'true' ? 'activated' : 'deactivated';
+                session()->flash('success', "SIM card {$status} successfully!");
+                
+                // Reload the batch items to reflect the changes
+                $this->loadBatchItems();
+            } else {
+                session()->flash('error', 'Failed to update SIM card status. Please try again.');
+            }
+            
+        } catch (\Exception $e) {
+            session()->flash('error', 'Error updating SIM card status: ' . $e->getMessage());
+        }
+    }
+
+    public function markSimSold($itemId) {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+            
+            if (!$token) {
+                session()->flash('error', 'Authentication token not found. Please log in again.');
+                return;
+            }
+            
+            $request = new UpdateSimCardStatusRequest(
+                token: $token,
+                itemId: $itemId,
+                status: 'is_sold',
+                value: true
+            );
+            
+            $response = $connector->send($request);
+            
+            if ($response->successful()) {
+                session()->flash('success', 'SIM card marked as sold successfully!');
+                
+                // Reload the batch items to reflect the changes
+                $this->loadBatchItems();
+            } else {
+                session()->flash('error', 'Failed to mark SIM card as sold. Please try again.');
+            }
+            
+        } catch (\Exception $e) {
+            session()->flash('error', 'Error marking SIM card as sold: ' . $e->getMessage());
+        }
     }
 }; ?>
 
@@ -755,7 +823,9 @@ new class extends Component {
                                     <thead class="bg-gray-50 sticky top-0">
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sold Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                                         </tr>
                                     </thead>
@@ -766,23 +836,42 @@ new class extends Component {
                                                     <div class="text-sm font-mono text-gray-900">{{ $item['serial_number'] ?? 'N/A' }}</div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
-                                                    @if($item['is_sold'] ?? false)
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                                            Sold
-                                                        </span>
-                                                    @elseif($item['is_deleted'] ?? false)
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                            Deleted
-                                                        </span>
-                                                    @elseif($item['is_active'] ?? false)
+                                                    @if($item['is_active'] ?? false)
                                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                             Active
                                                         </span>
                                                     @else
-                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                                             Inactive
                                                         </span>
                                                     @endif
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    @if($item['is_sold'] ?? false)
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                            Sold
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                            Available
+                                                        </span>
+                                                    @endif
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <div class="flex space-x-2">
+                                                        @if(!($item['is_sold'] ?? false))
+                                                            <button wire:click="toggleSimActive({{ $item['id'] }}, {{ $item['is_active'] ? 'false' : 'true' }})" 
+                                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md transition-colors duration-200 {{ $item['is_active'] ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200' }}">
+                                                                {{ $item['is_active'] ? 'Deactivate' : 'Activate' }}
+                                                            </button>
+                                                        @endif
+                                                        @if(!($item['is_sold'] ?? false) && ($item['is_active'] ?? false))
+                                                            <button wire:click="markSimSold({{ $item['id'] }})" 
+                                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors duration-200">
+                                                                Mark Sold
+                                                            </button>
+                                                        @endif
+                                                    </div>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                     {{ isset($item['created_at']) ? \Carbon\Carbon::parse($item['created_at'])->format('M d, Y H:i') : 'N/A' }}

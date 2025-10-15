@@ -41,7 +41,9 @@
                             <div class="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt class="text-sm font-medium text-gray-500 truncate">Transactions</dt>
+                                    @canuser('view transactions')
                                     <dd class="text-lg font-medium text-gray-900">0</dd>
+                                    @endcanuser
                                 </dl>
                             </div>
                         </div>
@@ -59,7 +61,9 @@
                             <div class="ml-5 w-0 flex-1">
                                 <dl>
                                     <dt class="text-sm font-medium text-gray-500 truncate">Customers</dt>
+                                    @canuser('delete businesses')
                                     <dd class="text-lg font-medium text-gray-900">0</dd>
+                                    @endcanuser
                                 </dl>
                             </div>
                         </div>
@@ -134,6 +138,19 @@
                                 </a>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Section -->
+            <div class="mt-8">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">
+                            Transaction Statistics
+                        </h3>
+                        
+                        <livewire:dashboard.include.transactions-statistics />
                     </div>
                 </div>
             </div>

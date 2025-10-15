@@ -17,13 +17,16 @@ new class extends Component
     public $businessesError = '';
     public $currentBusiness = null;
     public $userName = null;
-    
+    public $userPermissions = [];
     public function mount(){
+        $this->userPermissions = session('permissions', []);
+            dd($this->userPermissions);
         $checkAuthService = new CheckAuthService();
         if(!$checkAuthService->checkAuth()){
             return redirect('/login');
         }else{
-
+            // Fetch all permissions from the session and store in a property for Livewire/Blade components to use
+            
             $this->getallbusinesses();
             // Set the first business as selected if available
             if (!empty($this->businesses)) {

@@ -7,7 +7,8 @@
     
     <link rel="icon" type="image/png" href="{{ asset('logo/telcongh_main.png') }}">
     
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    @vite('resources/css/app.css')
     <script>
         tailwind.config = {
             theme: {

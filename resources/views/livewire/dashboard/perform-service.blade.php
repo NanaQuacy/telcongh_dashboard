@@ -7,6 +7,7 @@ use App\Http\Integrations\TelconApiConnector;
 use App\Http\Integrations\Requests\CustomerServiceDetailsRequest;
 use App\Http\Integrations\Requests\TransactionRequest;
 use App\Http\Integrations\Requests\PaymentDetailsRequest;
+use App\Http\Integrations\Requests\UpdateSimCardStatusRequest;
 
 new class extends Component {
     use WithFileUploads;
@@ -211,6 +212,8 @@ new class extends Component {
     }
     
     public function executeService() {
+        $stockItemId = session('verified_sim_stock_item_id');
+        
         $this->validate([
             'confirmDetails' => 'required|accepted',
         ]);
@@ -219,6 +222,7 @@ new class extends Component {
         // The checkActivationStatus() method is kept for display purposes only
         
         // Set loading state
+        
         $this->isExecuting = true;
         
         try {
@@ -239,6 +243,8 @@ new class extends Component {
                 'NOK_name' => $this->NOK_name,
                 'NOK_phone' => $this->NOK_phone,
                 'Alternate_phone_number' => $this->Alternate_phone_number,
+                'SIM_serial_number' => $this->simSerial,
+                'stock_item_id' => $stockItemId,
                 'MyMTNApp_Activation_Status' => $this->MyMTNApp_Activation_Status,
                 'MomoApp_Activation_Status' => $this->MomoApp_Activation_Status,
                 'ADS_Activation_Status' => $this->ADS_Activation_Status,
@@ -429,6 +435,11 @@ new class extends Component {
                 throw new \Exception('Failed to create payment details. Status: ' . $paymentStatusCode . '. Response: ' . $paymentResponse->body());
             }
             
+            // Step 4: Update SIM card status to sold (if using new SIM)
+            if ($this->isNewSim == '1') {
+                $this->updateSimCardSold();
+            }
+            
             // All requests successful
             $this->isExecuting = false;
             session()->flash('success', 'Service executed successfully! Customer service details, transaction, and payment have been created.');
@@ -490,11 +501,18 @@ new class extends Component {
         try {
             $networkService = new NetworkService(new TelconApiConnector());
             $response = $networkService->verifySimCard($this->simSerial, $this->businessId);
-            
+          
             if ($response->isSuccessful()) {
                 if ($response->isValid()) {
                     // Check if SIM is available for use
                     if ($response->isAvailable() === true) {
+                        // Store stock_item_id in session if available
+                        if ($response->getStockItemId()) {
+                            session(['verified_sim_stock_item_id' => $response->getStockItemId()]);
+                        }
+                        // Set SIM card status to inactive
+                        $this->setSimCardInactive();
+                        
                         $this->simVerificationStatus = 'verified';
                         $this->simVerificationMessage = 'SIM card verified and available for use';
                     } elseif ($response->isAvailable() === false) {
@@ -502,6 +520,14 @@ new class extends Component {
                         $this->simVerificationMessage = $response->getDisplayMessage();
                     } else {
                         // Fallback if availability status is not provided
+                        // Store stock_item_id in session if available
+                        if ($response->getStockItemId()) {
+                            session(['verified_sim_stock_item_id' => $response->getStockItemId()]);
+                        }
+                        
+                        // Set SIM card status to inactive
+                        $this->setSimCardInactive();
+                        
                         $this->simVerificationStatus = 'verified';
                         $this->simVerificationMessage = $response->getDisplayMessage();
                     }
@@ -517,6 +543,105 @@ new class extends Component {
         } catch (\Exception $e) {
             $this->simVerificationStatus = 'failed';
             $this->simVerificationMessage = 'Verification failed: ' . $e->getMessage();
+        }
+    }
+
+    private function setSimCardInactive() {
+        try {
+            $stockItemId = session('verified_sim_stock_item_id');
+            
+            if (!$stockItemId) {
+                \Log::warning('No stock_item_id found in session for SIM card status update');
+                return;
+            }
+            
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+            
+            if (!$token) {
+                \Log::error('No authentication token found for SIM card status update');
+                return;
+            }
+            
+            $request = new UpdateSimCardStatusRequest(
+                token: $token,
+                itemId: $stockItemId,
+                status: 'is_active',
+                value: false
+            );
+            
+            $response = $connector->send($request);
+            
+            if ($response->successful()) {
+                \Log::info('SIM card status updated to inactive', [
+                    'stock_item_id' => $stockItemId,
+                    'status' => 'is_active',
+                    'value' => false
+                ]);
+            } else {
+                \Log::error('Failed to update SIM card status', [
+                    'stock_item_id' => $stockItemId,
+                    'status_code' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Exception updating SIM card status', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    private function updateSimCardSold() {
+        try {
+            $stockItemId = session('verified_sim_stock_item_id');
+            
+            if (!$stockItemId) {
+                \Log::warning('No stock_item_id found in session for SIM card sold status update');
+                return;
+            }
+            
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+            
+            if (!$token) {
+                \Log::error('No authentication token found for SIM card sold status update');
+                return;
+            }
+            
+            $request = new UpdateSimCardStatusRequest(
+                token: $token,
+                itemId: $stockItemId,
+                status: 'is_sold',
+                value: true
+            );
+            
+            $response = $connector->send($request);
+            
+            if ($response->successful()) {
+                \Log::info('SIM card status updated to sold', [
+                    'stock_item_id' => $stockItemId,
+                    'status' => 'is_sold',
+                    'value' => true
+                ]);
+                
+                // Clear the session after successful update
+                session()->forget('verified_sim_stock_item_id');
+            } else {
+                \Log::error('Failed to update SIM card sold status', [
+                    'stock_item_id' => $stockItemId,
+                    'status_code' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Exception updating SIM card sold status', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 }; ?>

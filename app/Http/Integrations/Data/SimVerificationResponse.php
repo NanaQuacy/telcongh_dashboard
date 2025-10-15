@@ -16,7 +16,15 @@ class SimVerificationResponse
         public readonly ?string $message = null,
         public readonly ?bool $isAvailable = null,
         public readonly ?string $reason = null,
-        public readonly ?array $errors = null
+        public readonly ?array $errors = null,
+        public readonly ?int $stockItemId = null,
+        public readonly ?int $stockBatchId = null,
+        public readonly ?string $stockBatchName = null,
+        public readonly ?int $networkId = null,
+        public readonly ?int $businessId = null,
+        public readonly ?string $businessName = null,
+        public readonly ?bool $isActive = null,
+        public readonly ?bool $isSold = null
     ) {
         //
     }
@@ -38,7 +46,15 @@ class SimVerificationResponse
             message: $data['message'] ?? null,
             isAvailable: $data['data']['is_available'] ?? $data['is_available'] ?? null,
             reason: $data['data']['reason'] ?? $data['reason'] ?? null,
-            errors: $data['errors'] ?? null
+            errors: $data['errors'] ?? null,
+            stockItemId: $data['data']['stockitem_id'] ?? null,
+            stockBatchId: $data['data']['stock_batch_id'] ?? null,
+            stockBatchName: $data['data']['stock_batch_name'] ?? null,
+            networkId: $data['data']['network_id'] ?? null,
+            businessId: $data['data']['business_id'] ?? null,
+            businessName: $data['data']['business_name'] ?? null,
+            isActive: $data['data']['is_active'] ?? null,
+            isSold: $data['data']['is_sold'] ?? null
         );
     }
 
@@ -120,6 +136,70 @@ class SimVerificationResponse
     public function getReason(): ?string
     {
         return $this->reason;
+    }
+
+    /**
+     * Get the stock item ID
+     */
+    public function getStockItemId(): ?int
+    {
+        return $this->stockItemId;
+    }
+
+    /**
+     * Get the stock batch ID
+     */
+    public function getStockBatchId(): ?int
+    {
+        return $this->stockBatchId;
+    }
+
+    /**
+     * Get the stock batch name
+     */
+    public function getStockBatchName(): ?string
+    {
+        return $this->stockBatchName;
+    }
+
+    /**
+     * Get the network ID
+     */
+    public function getNetworkId(): ?int
+    {
+        return $this->networkId;
+    }
+
+    /**
+     * Get the business ID
+     */
+    public function getBusinessId(): ?int
+    {
+        return $this->businessId;
+    }
+
+    /**
+     * Get the business name
+     */
+    public function getBusinessName(): ?string
+    {
+        return $this->businessName;
+    }
+
+    /**
+     * Check if the SIM is active
+     */
+    public function getIsActive(): ?bool
+    {
+        return $this->isActive;
+    }
+
+    /**
+     * Check if the SIM is sold
+     */
+    public function getIsSold(): ?bool
+    {
+        return $this->isSold;
     }
 
     /**

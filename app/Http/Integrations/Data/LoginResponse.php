@@ -13,7 +13,9 @@ class LoginResponse
         public readonly ?UserData $user = null,
         public readonly ?array $businesses = null,
         public readonly ?string $message = null,
-        public readonly ?array $errors = null
+        public readonly ?array $errors = null,
+        public readonly ?array $roles = null,
+        public readonly ?array $permissions = null
     ) {
         //
     }
@@ -32,6 +34,8 @@ class LoginResponse
             user: isset($data['data']['user']) ? UserData::fromArray($data['data']['user']) : 
                   (isset($data['user']) ? UserData::fromArray($data['user']) : null),
             businesses: $data['data']['businesses'] ?? $data['businesses'] ?? null,
+            roles: $data['data']['roles'] ?? $data['roles'] ?? null,
+            permissions: $data['data']['permissions'] ?? $data['permissions'] ?? null,
             message: $data['message'] ?? null,
             errors: $data['errors'] ?? null
         );
@@ -75,5 +79,21 @@ class LoginResponse
     public function getErrors(): ?array
     {
         return $this->errors;
+    }
+
+    /**
+     * Get the roles data
+     */
+    public function getRoles(): ?array
+    {
+        return $this->roles;
+    }
+
+    /**
+     * Get the permissions data
+     */
+    public function getPermissions(): ?array
+    {
+        return $this->permissions;
     }
 }

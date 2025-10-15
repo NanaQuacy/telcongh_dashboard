@@ -39,7 +39,7 @@ class CustomerServiceDetailsRequest extends Request implements HasBody
             'full_name', 'phone_number', 'location',
             'NOK_name', 'NOK_phone', 'Business_id',
             'email', 'Alternate_phone_number', 'SIM_serial_number',
-            'Remarks', 'Reason_for_Action', 'Ticket_Number',
+            'Remarks', 'Reason_for_Action', 'Ticket_Number','stock_item_id',
             'Status', 'Handled_by'
         ];
 

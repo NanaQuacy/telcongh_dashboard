@@ -64,7 +64,46 @@ class AuthenticationService
     {
         $user = $loginResponse->getUser();
         $businesses = $loginResponse->getBusinesses();
+        $roles = $loginResponse->getRoles();
+        $permissions = $loginResponse->getPermissions();
         
+        // Extract role names from role objects
+        $roleNames = [];
+        if (is_array($roles)) {
+            foreach ($roles as $role) {
+                if (is_array($role) && isset($role['name'])) {
+                    $roleNames[] = $role['name'];
+                } elseif (is_object($role) && isset($role->name)) {
+                    $roleNames[] = $role->name;
+                }
+            }
+        }
+        
+        // Extract permission names from permission objects
+        $permissionNames = [];
+        if (is_array($permissions)) {
+            foreach ($permissions as $permission) {
+                if (is_array($permission) && isset($permission['name'])) {
+                    $permissionNames[] = $permission['name'];
+                } elseif (is_object($permission) && isset($permission->name)) {
+                    $permissionNames[] = $permission->name;
+                }
+            }
+        }
+        
+        // Debug logging to check the data structure
+        Log::info('Login response data', [
+            'original_roles' => $roles,
+            'original_permissions' => $permissions,
+            'extracted_role_names' => $roleNames,
+            'extracted_permission_names' => $permissionNames
+        ]);
+        
+        // Log what will be stored in session
+        Log::info('Session data to be stored', [
+            'roles' => $roleNames,
+            'permissions' => $permissionNames
+        ]);
         if ($user) {
             Session::put([
                 'user_id' => $user->id,
@@ -78,6 +117,8 @@ class AuthenticationService
                 'authenticated' => true,
                 'user_businesses' => $businesses,
                 'selected_business' => $businesses[0],
+                'roles' => $roleNames,
+                'permissions' => $permissionNames,
             ]);
         }
 
@@ -131,7 +172,9 @@ class AuthenticationService
                 'refresh_token',
                 'authenticated',
                 'user_businesses',
-                'selected_business'
+                'selected_business',
+                'roles',
+                'permissions'
             ]);
             session()->forget('user');
             session()->forget('token');
@@ -157,7 +200,9 @@ class AuthenticationService
                 'user_permissions',
                 'auth_token',
                 'refresh_token',
-                'authenticated'
+                'authenticated',
+                'roles',
+                'permissions'
             ]);
             
             return false;
@@ -214,6 +259,54 @@ class AuthenticationService
     public function hasRole(string $role): bool
     {
         return Session::get('user_role') === $role;
+    }
+
+    /**
+     * Get all user roles from session
+     */
+    public function getRoles(): array
+    {
+        return Session::get('roles', []);
+    }
+
+    /**
+     * Get all user permissions from session
+     */
+    public function getPermissions(): array
+    {
+        return Session::get('permissions', []);
+    }
+
+    /**
+     * Check if user has any of the specified roles
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        $userRoles = $this->getRoles();
+        return !empty(array_intersect($roles, $userRoles));
+    }
+
+    /**
+     * Check if user has any of the specified permissions
+     */
+    public function hasAnyPermission(array $permissions): bool
+    {
+        $userPermissions = $this->getPermissions();
+        return !empty(array_intersect($permissions, $userPermissions));
+    }
+
+    /**
+     * Debug method to check current session state
+     */
+    public function debugSessionState(): array
+    {
+        return [
+            'authenticated' => $this->isAuthenticated(),
+            'roles' => $this->getRoles(),
+            'permissions' => $this->getPermissions(),
+            'user_role' => Session::get('user_role'),
+            'user_permissions' => Session::get('user_permissions'),
+        ];
     }
 
     /**

@@ -29,3 +29,5 @@ Route::get('/dashboard/inventory', [DashboardController::class, 'inventory'])->n
 Route::post('/dashboard/switch-business', [DashboardController::class, 'switchBusiness'])->name('dashboard.switch-business');
 
 Route::get('/dashboard/perform-service', [ServiceController::class, 'performService'])->name('dashboard.perform-service');
+Route::get('/dashboard/roles', [DashboardController::class, 'roles'])->name('dashboard.roles');
+Route::get('/dashboard/users', [DashboardController::class, 'users'])->name('dashboard.users');

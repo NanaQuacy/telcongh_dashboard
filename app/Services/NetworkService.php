@@ -662,12 +662,20 @@ class NetworkService
             $token = Session::get('auth_token');
             if (!$token) {
                 Log::warning('No auth token found for SIM verification request');
-                return new SimVerificationResponse(
-                    success: false,
-                    isValid: false,
-                    message: 'Authentication token not found',
-                    errors: ['auth' => 'Authentication token not found']
-                );
+            return new SimVerificationResponse(
+                success: false,
+                isValid: false,
+                message: 'Authentication token not found',
+                errors: ['auth' => 'Authentication token not found'],
+                stockItemId: null,
+                stockBatchId: null,
+                stockBatchName: null,
+                networkId: null,
+                businessId: null,
+                businessName: null,
+                isActive: null,
+                isSold: null
+            );
             }
 
             $request = new SimVerificationRequest($token, $simSerialNumber, $businessId);
@@ -704,7 +712,15 @@ class NetworkService
                 success: false,
                 isValid: false,
                 message: 'SIM verification request failed. Please try again.',
-                errors: ['network' => 'Unable to connect to SIM verification service']
+                errors: ['network' => 'Unable to connect to SIM verification service'],
+                stockItemId: null,
+                stockBatchId: null,
+                stockBatchName: null,
+                networkId: null,
+                businessId: null,
+                businessName: null,
+                isActive: null,
+                isSold: null
             );
         }
     }

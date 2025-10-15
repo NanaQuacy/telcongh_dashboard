@@ -142,4 +142,28 @@ class DashboardController extends Controller
 
         return view('dashboard.inventory');
     }
+
+    /**
+     * Show the roles page
+     */
+    public function roles()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.roles');
+    }
+
+    /**
+     * Show the users page
+     */
+    public function users()
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        return view('dashboard.users');
+    }
 }
