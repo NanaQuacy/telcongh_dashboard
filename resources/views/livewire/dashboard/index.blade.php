@@ -18,6 +18,7 @@ new class extends Component
     public $currentBusiness = null;
     public $userName = null;
     public $userPermissions = [];
+    
     public function mount(){
         $this->userPermissions = session('permissions', []);
             dd($this->userPermissions);

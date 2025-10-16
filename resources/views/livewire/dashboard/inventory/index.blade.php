@@ -10,6 +10,7 @@ new class extends Component {
     public $batchesLoaded = false;
     public $batchesError = '';
     public $businessId = null;
+    public $statistics = [];
     
     // Networks for dropdown
     public $networks = [];
@@ -67,9 +68,9 @@ new class extends Component {
         try {
             $networkService = new NetworkService(new TelconApiConnector());
             $response = $networkService->getStockBatchesByBusiness($this->businessId);
-            
             if ($response->isSuccessful()) {
                 $this->batches = $response->getBatches();
+                $this->statistics = $response->getStatistics() ?? [];
                 $this->batchesLoaded = true;
                 $this->batchesError = '';
             } else {
@@ -135,15 +136,17 @@ new class extends Component {
         // Get the selected batch from the batches array
         $selectedBatch = collect($this->batches)->firstWhere('id', $this->selectedBatchId);
         
-        if ($selectedBatch && isset($selectedBatch['stock_items'])) {
+        if ($selectedBatch && isset($selectedBatch['stock_items']) && is_array($selectedBatch['stock_items'])) {
             $this->batchItems = $selectedBatch['stock_items'];
             $this->itemsLoaded = true;
             $this->itemsError = '';
         } else {
             $this->itemsError = 'No items found for this batch.';
             $this->itemsLoaded = false;
+            $this->batchItems = [];
         }
     }
+
     
     public function createBatch() {
         $this->validate([
@@ -442,6 +445,121 @@ new class extends Component {
                     </div>
                 </div>
                 
+                @if(!empty($statistics))
+                <!-- Statistics Cards -->
+                <div class="px-8 py-6 border-b border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <!-- Total Items -->
+                        <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-blue-600">Total Items</p>
+                                    <p class="text-3xl font-bold text-blue-900">{{ $statistics['total_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-lg bg-blue-200 flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Available Items -->
+                        <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-green-600">Available</p>
+                                    <p class="text-3xl font-bold text-green-900">{{ $statistics['available_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-lg bg-green-200 flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Sold Items -->
+                        <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-purple-600">Sold</p>
+                                    <p class="text-3xl font-bold text-purple-900">{{ $statistics['sold_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-lg bg-purple-200 flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Availability Percentage -->
+                        <div class="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-orange-600">Availability</p>
+                                    <p class="text-3xl font-bold text-orange-900">{{ number_format($statistics['availability_percentage'] ?? 0, 1) }}%</p>
+                                </div>
+                                <div class="w-12 h-12 rounded-lg bg-orange-200 flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Additional Statistics Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Active Items -->
+                        <div class="bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Active Items</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['active_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Inactive Items -->
+                        <div class="bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Inactive Items</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['inactive_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Unavailable Items -->
+                        <div class="bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Unavailable</p>
+                                    <p class="text-2xl font-bold text-gray-900">{{ $statistics['unavailable_items'] ?? 0 }}</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+                
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200/50">
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -452,6 +570,7 @@ new class extends Component {
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">ICCID Range</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Quantity</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Stock Count</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Batch Statistics</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Cost</th>
                                 <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -500,8 +619,32 @@ new class extends Component {
                                     </td>
                                     <td class="px-6 py-6 whitespace-nowrap">
                                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 border border-blue-200">
-                                            {{ $batch['stock_items_count'] ?? 0 }}
+                                            {{ $batch['statistics']['total_items'] ?? 0 }}
                                         </span>
+                                    </td>
+                                    <td class="px-6 py-6 whitespace-nowrap">
+                                        <div class="space-y-2">
+                                            <!-- Available Items -->
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs text-gray-600">Available:</span>
+                                                <span class="text-xs font-semibold text-green-600">{{ $batch['statistics']['available_items'] ?? 0 }}</span>
+                                            </div>
+                                            <!-- Sold Items -->
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs text-gray-600">Sold:</span>
+                                                <span class="text-xs font-semibold text-purple-600">{{ $batch['statistics']['sold_items'] ?? 0 }}</span>
+                                            </div>
+                                            <!-- Active Items -->
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs text-gray-600">Active:</span>
+                                                <span class="text-xs font-semibold text-blue-600">{{ $batch['statistics']['active_items'] ?? 0 }}</span>
+                                            </div>
+                                            <!-- Availability Percentage -->
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-xs text-gray-600">Availability:</span>
+                                                <span class="text-xs font-semibold text-orange-600">{{ number_format($batch['statistics']['availability_percentage'] ?? 0, 1) }}%</span>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-6 whitespace-nowrap">
                                         <div class="text-sm font-bold text-gray-900">₵{{ number_format($batch['cost'] ?? 0, 2) }}</div>
@@ -515,7 +658,7 @@ new class extends Component {
                                                 </svg>
                                                 Add Items
                                             </button>
-                                            @if(($batch['stock_items_count'] ?? 0) > 0)
+                                            @if(($batch['statistics']['total_items'] ?? 0) > 0)
                                                 <button wire:click="showViewItems({{ $batch['id'] }})" 
                                                         class="inline-flex items-center px-3 py-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-all duration-200 font-medium">
                                                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -607,7 +750,7 @@ new class extends Component {
 
     <!-- Create Batch Modal -->
     @if($showCreateBatchForm)
-        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in" wire:click="cancelBatchForm">
+        <div class="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50 animate-fade-in" wire:click="cancelBatchForm">
             <div class="relative top-10 mx-auto p-6 border w-full max-w-3xl shadow-2xl rounded-2xl bg-white/95 backdrop-blur-sm" wire:click.stop>
                 <div class="mt-3">
                     <div class="flex items-center justify-between mb-8">
@@ -725,7 +868,7 @@ new class extends Component {
 
     <!-- Create Stock Items Modal -->
     @if($showCreateItemsForm)
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="cancelItemsForm">
+        <div class="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50" wire:click="cancelItemsForm">
             <div class="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white" wire:click.stop>
                 <div class="mt-3">
                     <div class="flex items-center justify-between mb-6">
@@ -773,7 +916,7 @@ new class extends Component {
 
     <!-- View Stock Items Modal -->
     @if($showViewItemsForm)
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="cancelViewItemsForm">
+        <div class="fixed inset-0 backdrop-blur-sm overflow-y-auto h-full w-full z-50" wire:click="cancelViewItemsForm">
             <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white" wire:click.stop>
                 <div class="mt-3">
                     <div class="flex items-center justify-between mb-6">
@@ -790,7 +933,7 @@ new class extends Component {
                             <h4 class="font-medium text-gray-900">{{ $this->getSelectedBatch()['name'] ?? 'Batch' }}</h4>
                             <p class="text-sm text-gray-600">{{ $this->getSelectedBatch()['description'] ?? 'No description' }}</p>
                             <p class="text-sm text-gray-500 mt-1">
-                                Total Items: {{ $this->getSelectedBatch()['stock_items_count'] ?? 0 }} | 
+                                Total Items: {{ $this->getSelectedBatch()['statistics']['total_items'] ?? 0 }} | 
                                 Cost: ₵{{ number_format($this->getSelectedBatch()['cost'] ?? 0, 2) }}
                             </p>
                         </div>
