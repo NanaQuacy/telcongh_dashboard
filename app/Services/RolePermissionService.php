@@ -200,11 +200,21 @@ class RolePermissionService
     /**
      * Get all permissions
      */
-    public function getAllPermissions(?string $token = null): PermissionsListResponse
+    public function getAllPermissions(?string $token = null, int $page = 1, int $perPage = 15): PermissionsListResponse
     {
         try {
-            $request = new GetPermissionsRequest($token);
+            $request = new GetPermissionsRequest($token, $page, $perPage);
             $response = $this->connector->send($request);
+
+            // Debug: Log response details
+            Log::info('GetPermissions API Response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'page' => $page,
+                'per_page' => $perPage,
+                'body' => $response->body(),
+                'json' => $response->json()
+            ]);
 
             if ($response->successful()) {
                 return PermissionsListResponse::fromResponse($response);

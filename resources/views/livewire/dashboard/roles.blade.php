@@ -20,6 +20,10 @@ new class extends Component {
     
     // Permissions data
     public $permissions = [];
+    public $permissionsTotal = 0;
+    public $permissionsPerPage = 15;
+    public $permissionsCurrentPage = 1;
+    public $permissionsLastPage = 1;
     public $newPermissionName = '';
     public $newPermissionDescription = '';
     public $editingPermission = null;
@@ -70,10 +74,9 @@ new class extends Component {
             
             $token = session('auth_token');
             $rolesResponse = $this->rolePermissionService->getAllRoles($token);
-            
             // Debug: Log the raw response
             Log::info('Raw roles response', ['response' => $rolesResponse]);
-            
+            //dd($rolesResponse);
             $this->roles = [];
 
             foreach ($rolesResponse->getRoles() as $role) {
@@ -227,7 +230,7 @@ new class extends Component {
     }
 
     // Permissions Management
-    public function loadPermissions()
+    public function loadPermissions($page = 1)
     {
         try {
             $this->initializeService();
@@ -235,7 +238,7 @@ new class extends Component {
             $this->error = null;
             
             $token = session('auth_token');
-            $permissionsResponse = $this->rolePermissionService->getAllPermissions($token);
+            $permissionsResponse = $this->rolePermissionService->getAllPermissions($token, $page, $this->permissionsPerPage);
             
             $this->permissions = [];
             foreach ($permissionsResponse->getPermissions() as $permission) {
@@ -247,7 +250,18 @@ new class extends Component {
                 ];
             }
             
-            Log::info('Permissions loaded successfully', ['count' => count($this->permissions)]);
+            // Update pagination data
+            $this->permissionsTotal = $permissionsResponse->getTotal();
+            $this->permissionsPerPage = $permissionsResponse->getPerPage();
+            $this->permissionsCurrentPage = $permissionsResponse->getCurrentPage();
+            $this->permissionsLastPage = $permissionsResponse->getLastPage();
+            
+            Log::info('Permissions loaded successfully', [
+                'count' => count($this->permissions),
+                'total' => $this->permissionsTotal,
+                'current_page' => $this->permissionsCurrentPage,
+                'last_page' => $this->permissionsLastPage
+            ]);
         } catch (\Exception $e) {
             $this->error = 'Failed to load permissions: ' . $e->getMessage();
             Log::error('Error loading permissions: ' . $e->getMessage());
@@ -353,6 +367,29 @@ new class extends Component {
         $this->editingPermission = null;
         $this->editPermissionName = '';
         $this->editPermissionDescription = '';
+    }
+
+    // Permissions Pagination
+    public function goToPermissionsPage($page)
+    {
+        if ($page >= 1 && $page <= $this->permissionsLastPage) {
+            $this->permissionsCurrentPage = $page;
+            $this->loadPermissions($page);
+        }
+    }
+
+    public function nextPermissionsPage()
+    {
+        if ($this->permissionsCurrentPage < $this->permissionsLastPage) {
+            $this->goToPermissionsPage($this->permissionsCurrentPage + 1);
+        }
+    }
+
+    public function previousPermissionsPage()
+    {
+        if ($this->permissionsCurrentPage > 1) {
+            $this->goToPermissionsPage($this->permissionsCurrentPage - 1);
+        }
     }
 
     public function deletePermission($permissionId)
@@ -720,7 +757,12 @@ new class extends Component {
                 <!-- Permissions List -->
                 <div class="bg-white shadow rounded-lg">
                     <div class="px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-lg font-medium text-gray-900">Existing Permissions</h3>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-gray-900">Existing Permissions</h3>
+                            <div class="text-sm text-gray-500">
+                                Showing {{ count($permissions) }} of {{ $permissionsTotal }} permissions
+                            </div>
+                        </div>
                     </div>
                     <div class="overflow-hidden">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -773,6 +815,97 @@ new class extends Component {
                             </tbody>
                         </table>
                     </div>
+                    
+                    <!-- Permissions Pagination -->
+                    @if($permissionsLastPage > 1)
+                    <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                        <div class="flex-1 flex justify-between sm:hidden">
+                            <button wire:click="previousPermissionsPage" 
+                                    @if($permissionsCurrentPage <= 1) disabled @endif
+                                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Previous
+                            </button>
+                            <button wire:click="nextPermissionsPage" 
+                                    @if($permissionsCurrentPage >= $permissionsLastPage) disabled @endif
+                                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
+                        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm text-gray-700">
+                                    Showing
+                                    <span class="font-medium">{{ (($permissionsCurrentPage - 1) * $permissionsPerPage) + 1 }}</span>
+                                    to
+                                    <span class="font-medium">{{ min($permissionsCurrentPage * $permissionsPerPage, $permissionsTotal) }}</span>
+                                    of
+                                    <span class="font-medium">{{ $permissionsTotal }}</span>
+                                    results
+                                </p>
+                            </div>
+                            <div>
+                                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                    <!-- Previous Button -->
+                                    <button wire:click="previousPermissionsPage" 
+                                            @if($permissionsCurrentPage <= 1) disabled @endif
+                                            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span class="sr-only">Previous</span>
+                                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    
+                                    <!-- Page Numbers -->
+                                    @php
+                                        $start = max(1, $permissionsCurrentPage - 2);
+                                        $end = min($permissionsLastPage, $permissionsCurrentPage + 2);
+                                    @endphp
+                                    
+                                    @if($start > 1)
+                                        <button wire:click="goToPermissionsPage(1)" 
+                                                class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                            1
+                                        </button>
+                                        @if($start > 2)
+                                            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                                ...
+                                            </span>
+                                        @endif
+                                    @endif
+                                    
+                                    @for($i = $start; $i <= $end; $i++)
+                                        <button wire:click="goToPermissionsPage({{ $i }})" 
+                                                class="relative inline-flex items-center px-4 py-2 border text-sm font-medium {{ $i === $permissionsCurrentPage ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' }}">
+                                            {{ $i }}
+                                        </button>
+                                    @endfor
+                                    
+                                    @if($end < $permissionsLastPage)
+                                        @if($end < $permissionsLastPage - 1)
+                                            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                                ...
+                                            </span>
+                                        @endif
+                                        <button wire:click="goToPermissionsPage({{ $permissionsLastPage }})" 
+                                                class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                            {{ $permissionsLastPage }}
+                                        </button>
+                                    @endif
+                                    
+                                    <!-- Next Button -->
+                                    <button wire:click="nextPermissionsPage" 
+                                            @if($permissionsCurrentPage >= $permissionsLastPage) disabled @endif
+                                            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span class="sr-only">Next</span>
+                                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
 
                 <!-- Role-Permission Assignment -->

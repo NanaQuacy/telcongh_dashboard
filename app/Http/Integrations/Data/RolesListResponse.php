@@ -19,8 +19,10 @@ class RolesListResponse
         // Debug: Log the raw response
         \Log::info('Raw API response', ['response' => $response->json()]);
         
-        $data = $response->json('data', []);
-        $pagination = $response->json('pagination', []);
+        // The API response structure is: { "status": "success", "data": { "data": [...] } }
+        $responseData = $response->json('data', []);
+        $data = $responseData['data'] ?? $responseData; // Handle nested data structure
+        $pagination = $responseData['pagination'] ?? $response->json('pagination', []);
 
         $roles = [];
         if (is_array($data)) {

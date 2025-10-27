@@ -5,11 +5,12 @@ namespace App\Http\Integrations\Requests;
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
 
-class GetPermissionsRequest extends Request
+class BusinessUsersRequest extends Request
 {
     protected Method $method = Method::GET;
 
     public function __construct(
+        protected int $businessId,
         protected ?string $token = null,
         protected int $page = 1,
         protected int $perPage = 15
@@ -17,7 +18,7 @@ class GetPermissionsRequest extends Request
 
     public function resolveEndpoint(): string
     {
-        return "/permissions";
+        return "/user-business/by-business/{$this->businessId}";
     }
 
     protected function defaultHeaders(): array

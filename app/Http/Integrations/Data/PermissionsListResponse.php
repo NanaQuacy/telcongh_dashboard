@@ -16,22 +16,28 @@ class PermissionsListResponse
 
     public static function fromResponse(Response $response): self
     {
-        $data = $response->json('data', []);
-        $meta = $response->json('meta', []);
+        // Debug: Log the raw response
+        \Log::info('Raw Permissions API response', ['response' => $response->json()]);
+        
+        // The API response structure is: { "status": "success", "data": { "data": [...] } }
+        $responseData = $response->json('data', []);
+        $data = $responseData['data'] ?? $responseData; // Handle nested data structure
+        $pagination = $responseData['pagination'] ?? $response->json('pagination', []);
 
         $permissions = [];
         if (is_array($data)) {
             foreach ($data as $permissionData) {
+                \Log::info('Processing permission data', ['permissionData' => $permissionData]);
                 $permissions[] = PermissionResponse::fromArray($permissionData);
             }
         }
 
         return new self(
             permissions: $permissions,
-            total: $meta['total'] ?? count($permissions),
-            perPage: $meta['per_page'] ?? 15,
-            currentPage: $meta['current_page'] ?? 1,
-            lastPage: $meta['last_page'] ?? 1,
+            total: $pagination['total'] ?? count($permissions),
+            perPage: $pagination['per_page'] ?? 15,
+            currentPage: $pagination['current_page'] ?? 1,
+            lastPage: $pagination['last_page'] ?? 1,
         );
     }
 

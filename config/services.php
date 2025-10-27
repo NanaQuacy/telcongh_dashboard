@@ -36,7 +36,7 @@ return [
     ],
 
     'telcon' => [
-        'base_url' => env('TELCON_API_BASE_URL', 'https://api.telcon.com/v1'),
+        'base_url' => env('TELCON_API_BASE_URL', 'http://127.0.0.1:8000/api'),
         'timeout' => env('TELCON_API_TIMEOUT', 30),
         'api_key' => env('TELCON_API_KEY'),
     ],

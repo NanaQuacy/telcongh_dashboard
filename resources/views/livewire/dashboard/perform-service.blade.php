@@ -381,7 +381,7 @@ new class extends Component {
                 'cost_price' => $this->serviceData['cost_price'] ?? 0,
                 'selling_price' => $this->serviceData['selling_price'] ?? 0,
                 'profit' => ($this->serviceData['selling_price'] ?? 0) - ($this->serviceData['cost_price'] ?? 0),
-                'transaction_status' => 'completed',
+                'transaction_status' => 'pending',
                 'transaction_notes' => 'Service executed via dashboard',
                 'is_active' => true,
                 'is_deleted' => false,
@@ -422,8 +422,8 @@ new class extends Component {
                 'paid_amount' => $this->serviceData['selling_price'] ?? 0,
                 'due_amount' => 0,
                 'payment_date' => now()->toDateString(),
-                'payment_notes' => 'Payment completed for service execution',
-                'payment_status' => 'completed',
+                'payment_notes' => 'Payment  pending for service execution',
+                'payment_status' => 'pending',
                 'business_id' => $this->businessId,
             ];
             

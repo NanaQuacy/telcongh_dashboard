@@ -12,7 +12,8 @@ class GetTransactionRequest extends Request
     public function __construct(
         protected ?int $businessId = null,
         protected ?int $transactionId = null,
-        protected ?string $token = null
+        protected ?string $token = null,
+        protected array $filters = []
     ) {}
 
     public function resolveEndpoint(): string
@@ -45,43 +46,50 @@ class GetTransactionRequest extends Request
     {
         $query = [];
 
+        // Use filters passed to constructor first, then fall back to request parameters
+        $filters = !empty($this->filters) ? $this->filters : request()->all();
+        
         // Add common query parameters for filtering transactions
         // Note: business_id is now part of the URL path, not a query parameter
         
-        if (request()->has('status')) {
-            $query['status'] = request()->get('status');
+        if (isset($filters['status'])) {
+            $query['status'] = $filters['status'];
         }
 
-        if (request()->has('payment_status')) {
-            $query['payment_status'] = request()->get('payment_status');
+        if (isset($filters['payment_status'])) {
+            $query['payment_status'] = $filters['payment_status'];
         }
 
-        if (request()->has('date_from')) {
-            $query['date_from'] = request()->get('date_from');
+        if (isset($filters['date_from'])) {
+            $query['date_from'] = $filters['date_from'];
         }
 
-        if (request()->has('date_to')) {
-            $query['date_to'] = request()->get('date_to');
+        if (isset($filters['date_to'])) {
+            $query['date_to'] = $filters['date_to'];
         }
 
-        if (request()->has('limit')) {
-            $query['limit'] = request()->get('limit');
+        if (isset($filters['limit'])) {
+            $query['limit'] = $filters['limit'];
         }
 
-        if (request()->has('page')) {
-            $query['page'] = request()->get('page');
+        if (isset($filters['per_page'])) {
+            $query['per_page'] = $filters['per_page'];
         }
 
-        if (request()->has('search')) {
-            $query['search'] = request()->get('search');
+        if (isset($filters['page'])) {
+            $query['page'] = $filters['page'];
         }
 
-        if (request()->has('sort_by')) {
-            $query['sort_by'] = request()->get('sort_by');
+        if (isset($filters['search'])) {
+            $query['search'] = $filters['search'];
         }
 
-        if (request()->has('sort_order')) {
-            $query['sort_order'] = request()->get('sort_order');
+        if (isset($filters['sort_by'])) {
+            $query['sort_by'] = $filters['sort_by'];
+        }
+
+        if (isset($filters['sort_order'])) {
+            $query['sort_order'] = $filters['sort_order'];
         }
 
         return $query;

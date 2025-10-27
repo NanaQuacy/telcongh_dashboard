@@ -16,15 +16,20 @@ class UsersListResponse
 
     public static function fromResponse(Response $response): self
     {
-        $data = $response->json('data', []);
-        $meta = $response->json('meta', []);
+        // Debug: Log the raw response
+        \Log::info('Raw Users API response', ['response' => $response->json()]);
+        
+        // The API response structure is: { "status": "success", "data": { "data": [...] } }
+        $responseData = $response->json('data', []);
+        $data = $responseData['data'] ?? $responseData; // Handle nested data structure
+        $pagination = $responseData['pagination'] ?? $response->json('pagination', []);
 
         return new self(
             users: $data ?? [],
-            total: $meta['total'] ?? count($data ?? []),
-            perPage: $meta['per_page'] ?? 15,
-            currentPage: $meta['current_page'] ?? 1,
-            lastPage: $meta['last_page'] ?? 1,
+            total: $pagination['total'] ?? count($data ?? []),
+            perPage: $pagination['per_page'] ?? 15,
+            currentPage: $pagination['current_page'] ?? 1,
+            lastPage: $pagination['last_page'] ?? 1,
         );
     }
 

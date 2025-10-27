@@ -11,6 +11,7 @@ Route::get('/', [AuthController::class, 'home']);
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+Route::get('/business-registration', [AuthController::class, 'showBusinessRegistration'])->name('business-registration');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Dashboard Routes
@@ -31,3 +32,6 @@ Route::post('/dashboard/switch-business', [DashboardController::class, 'switchBu
 Route::get('/dashboard/perform-service', [ServiceController::class, 'performService'])->name('dashboard.perform-service');
 Route::get('/dashboard/roles', [DashboardController::class, 'roles'])->name('dashboard.roles');
 Route::get('/dashboard/users', [DashboardController::class, 'users'])->name('dashboard.users');
+
+// Download route for temporary files
+Route::get('/download/temp/{filename}', [DashboardController::class, 'downloadTemp'])->name('download.temp');

@@ -45,6 +45,17 @@ class AuthController extends Controller
     }
 
     /**
+     * Show the business registration page
+     */
+    public function showBusinessRegistration()
+    {
+        if ($this->checkAuthService->checkAuth()) {
+            return redirect('/dashboard');
+        }
+        return view('auth.business-registration');
+    }
+
+    /**
      * Handle user logout
      */
     public function logout()

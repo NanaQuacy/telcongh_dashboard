@@ -3,6 +3,10 @@
 use Livewire\Volt\Component;
 use App\Http\Integrations\TelconApiConnector;
 use App\Http\Integrations\Requests\GetBusinessTransactionsRequest;
+use App\Http\Integrations\Requests\ApproveTransactionRequest;
+use App\Http\Integrations\Requests\RejectTransactionRequest;
+use App\Http\Integrations\Requests\ApprovePaymentRequest;
+use App\Http\Integrations\Requests\RejectPaymentRequest;
 use App\Http\Integrations\Data\TransactionResponse;
 
 new class extends Component {
@@ -31,6 +35,12 @@ new class extends Component {
 
     public $pagination = [];
     public $totalTransactions = 0;
+
+    // Confirmation modal properties
+    public $showApprovalModal = false;
+    public $approvalType = ''; // 'transaction_approve', 'transaction_reject', 'payment_approve', 'payment_reject'
+    public $approvalTransactionId = null;
+    public $approvalTransactionData = null;
 
     public function mount()
     {
@@ -292,9 +302,246 @@ new class extends Component {
     {
         $this->showCustomerModal = false;
         $this->showPaymentModal = false;
+        $this->showApprovalModal = false;
         $this->selectedCustomerData = null;
         $this->selectedPaymentData = null;
         $this->selectedTransactionId = null;
+        $this->approvalTransactionId = null;
+        $this->approvalTransactionData = null;
+        $this->approvalType = '';
+    }
+
+    public function showApprovalConfirmation($type, $transactionId)
+    {
+        $transaction = collect($this->transactions)->firstWhere('id', $transactionId);
+        if (!$transaction) {
+            $this->error = 'Transaction not found.';
+            return;
+        }
+
+        $this->approvalType = $type;
+        $this->approvalTransactionId = $transactionId;
+        $this->approvalTransactionData = $transaction;
+        $this->showApprovalModal = true;
+    }
+
+    public function confirmApproval()
+    {
+        switch ($this->approvalType) {
+            case 'transaction_approve':
+                $this->approveTransaction($this->approvalTransactionId);
+                break;
+            case 'transaction_reject':
+                $this->rejectTransaction($this->approvalTransactionId);
+                break;
+            case 'payment_approve':
+                $this->approvePayment($this->approvalTransactionId);
+                break;
+            case 'payment_reject':
+                $this->rejectPayment($this->approvalTransactionId);
+                break;
+        }
+        
+        $this->closeModals();
+    }
+
+    public function approveTransaction($transactionId)
+    {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+
+            if (!$token) {
+                $this->error = 'Authentication token not found. Please login again.';
+                return;
+            }
+
+            $request = new ApproveTransactionRequest($transactionId, $token);
+            $response = $connector->send($request);
+
+            if ($response->successful()) {
+                \Log::info('Transaction approved successfully', [
+                    'transaction_id' => $transactionId,
+                    'business_id' => $this->businessId
+                ]);
+                
+                // Reload transactions to reflect the change
+                $this->loadTransactions();
+                
+                // Show success message
+                session()->flash('success', 'Transaction approved successfully!');
+            } else {
+                $this->error = 'Failed to approve transaction. Status: ' . $response->status();
+                \Log::error('Failed to approve transaction', [
+                    'transaction_id' => $transactionId,
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->error = 'Error approving transaction: ' . $e->getMessage();
+            \Log::error('Exception approving transaction', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    public function rejectTransaction($transactionId)
+    {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+
+            if (!$token) {
+                $this->error = 'Authentication token not found. Please login again.';
+                return;
+            }
+
+            $request = new RejectTransactionRequest($transactionId, $token);
+            $response = $connector->send($request);
+
+            if ($response->successful()) {
+                \Log::info('Transaction rejected successfully', [
+                    'transaction_id' => $transactionId,
+                    'business_id' => $this->businessId
+                ]);
+                
+                // Reload transactions to reflect the change
+                $this->loadTransactions();
+                
+                // Show success message
+                session()->flash('success', 'Transaction rejected successfully!');
+            } else {
+                $this->error = 'Failed to reject transaction. Status: ' . $response->status();
+                \Log::error('Failed to reject transaction', [
+                    'transaction_id' => $transactionId,
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->error = 'Error rejecting transaction: ' . $e->getMessage();
+            \Log::error('Exception rejecting transaction', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    public function approvePayment($transactionId)
+    {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+
+            if (!$token) {
+                $this->error = 'Authentication token not found. Please login again.';
+                return;
+            }
+
+            // Find the transaction to get the payment ID
+            $transaction = collect($this->transactions)->firstWhere('id', $transactionId);
+            if (!$transaction || !isset($transaction['payment_detail']['id'])) {
+                $this->error = 'Payment details not found for this transaction.';
+                return;
+            }
+
+            $paymentId = $transaction['payment_detail']['id'];
+            
+            \Log::info('Attempting to approve payment', [
+                'transaction_id' => $transactionId,
+                'payment_id' => $paymentId,
+                'endpoint' => "/payment-details/{$paymentId}/approve"
+            ]);
+          
+            $request = new ApprovePaymentRequest($paymentId, $token);
+            $response = $connector->send($request);
+
+            if ($response->successful()) {
+                \Log::info('Payment approved successfully', [
+                    'transaction_id' => $transactionId,
+                    'payment_id' => $paymentId,
+                    'business_id' => $this->businessId
+                ]);
+                
+                // Reload transactions to reflect the change
+                $this->loadTransactions();
+                
+                // Show success message
+                session()->flash('success', 'Payment approved successfully!');
+            } else {
+                $this->error = 'Failed to approve payment. Status: ' . $response->status();
+                \Log::error('Failed to approve payment', [
+                    'transaction_id' => $transactionId,
+                    'payment_id' => $paymentId,
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->error = 'Error approving payment: ' . $e->getMessage();
+            \Log::error('Exception approving payment', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    public function rejectPayment($transactionId)
+    {
+        try {
+            $connector = new TelconApiConnector();
+            $token = session('auth_token');
+
+            if (!$token) {
+                $this->error = 'Authentication token not found. Please login again.';
+                return;
+            }
+
+            // Find the transaction to get the payment ID
+            $transaction = collect($this->transactions)->firstWhere('id', $transactionId);
+            if (!$transaction || !isset($transaction['payment_detail']['id'])) {
+                $this->error = 'Payment details not found for this transaction.';
+                return;
+            }
+
+            $paymentId = $transaction['payment_detail']['id'];
+            $request = new RejectPaymentRequest($paymentId, $token);
+            $response = $connector->send($request);
+
+            if ($response->successful()) {
+                \Log::info('Payment rejected successfully', [
+                    'transaction_id' => $transactionId,
+                    'payment_id' => $paymentId,
+                    'business_id' => $this->businessId
+                ]);
+                
+                // Reload transactions to reflect the change
+                $this->loadTransactions();
+                
+                // Show success message
+                session()->flash('success', 'Payment rejected successfully!');
+            } else {
+                $this->error = 'Failed to reject payment. Status: ' . $response->status();
+                \Log::error('Failed to reject payment', [
+                    'transaction_id' => $transactionId,
+                    'payment_id' => $paymentId,
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->error = 'Error rejecting payment: ' . $e->getMessage();
+            \Log::error('Exception rejecting payment', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 }; ?>
 
@@ -398,6 +645,23 @@ new class extends Component {
         </div>
     @endif
 
+    <!-- Success Message -->
+    @if(session()->has('success'))
+        <div class="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-green-800">Success</h3>
+                    <div class="mt-2 text-sm text-green-700">{{ session('success') }}</div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Error State -->
     @if($error)
         <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
@@ -443,6 +707,12 @@ new class extends Component {
                                 <button wire:click="sortBy('transaction_status')" class="flex items-center space-x-1 hover:text-gray-700 focus:outline-none">
                                     <span>Status</span>
                                     <span class="text-xs">{{ $this->getSortIcon('transaction_status') }}</span>
+                                </button>
+                            </th>
+                            <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <button wire:click="sortBy('payment_status')" class="flex items-center space-x-1 hover:text-gray-700 focus:outline-none">
+                                    <span>Payment Status</span>
+                                    <span class="text-xs">{{ $this->getSortIcon('payment_status') }}</span>
                                 </button>
                             </th>
                             <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -533,21 +803,58 @@ new class extends Component {
                                         {{ ucfirst($transactionData['transaction_status'] ?? 'Unknown') }}
                                     </span>
                                 </td>
+                                <!-- Payment Status -->
+                                <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full {{ $this->getPaymentStatusBadgeClass($paymentData['payment_status'] ?? 'unknown') }}">
+                                        {{ ucfirst($paymentData['payment_status'] ?? 'Unknown') }}
+                                    </span>
+                                </td>
 
                                 <!-- Actions -->
-                                <td class="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <div class="flex flex-col space-y-1">
-                                        @if($customerData)
-                                            <button wire:click="viewCustomerDetails({{ $transactionData['id'] }})" 
-                                                    class="text-indigo-600 hover:text-indigo-900 text-xs bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded">
-                                                View Customer
-                                            </button>
+                                <td class="px-4 sm:px-6 py-4 text-sm font-medium">
+                                    <div class="space-y-2">
+                                        <!-- View Actions Row -->
+                                        <div class="flex flex-wrap gap-1">
+                                            @if($customerData)
+                                                <button wire:click="viewCustomerDetails({{ $transactionData['id'] }})" 
+                                                        class="text-indigo-600 hover:text-indigo-900 text-xs bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded">
+                                                    👤 Customer
+                                                </button>
+                                            @endif
+                                            @if($paymentData)
+                                                <button wire:click="viewPaymentDetails({{ $transactionData['id'] }})" 
+                                                        class="text-green-600 hover:text-green-900 text-xs bg-green-50 hover:bg-green-100 px-2 py-1 rounded">
+                                                    💳 Payment
+                                                </button>
+                                            @endif
+                                        </div>
+                                        
+                                        <!-- Transaction Approval Row -->
+                                        @if(($transactionData['transaction_status'] ?? '') === 'pending')
+                                            <div class="flex flex-wrap gap-1">
+                                                <button wire:click="showApprovalConfirmation('transaction_approve', {{ $transactionData['id'] }})" 
+                                                        class="text-green-600 hover:text-green-900 text-xs bg-green-50 hover:bg-green-100 px-2 py-1 rounded border border-green-200">
+                                                    ✓ Approve
+                                                </button>
+                                                <button wire:click="showApprovalConfirmation('transaction_reject', {{ $transactionData['id'] }})" 
+                                                        class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200">
+                                                    ✗ Reject
+                                                </button>
+                                            </div>
                                         @endif
-                                        @if($paymentData)
-                                            <button wire:click="viewPaymentDetails({{ $transactionData['id'] }})" 
-                                                    class="text-green-600 hover:text-green-900 text-xs bg-green-50 hover:bg-green-100 px-2 py-1 rounded">
-                                                View Payment
-                                            </button>
+                                        
+                                        <!-- Payment Approval Row -->
+                                        @if($paymentData && ($paymentData['payment_status'] ?? '') === 'pending')
+                                            <div class="flex flex-wrap gap-1">
+                                                <button wire:click="showApprovalConfirmation('payment_approve', {{ $transactionData['id'] }})" 
+                                                        class="text-green-600 hover:text-green-900 text-xs bg-green-50 hover:bg-green-100 px-2 py-1 rounded border border-green-200">
+                                                    💳 Approve
+                                                </button>
+                                                <button wire:click="showApprovalConfirmation('payment_reject', {{ $transactionData['id'] }})" 
+                                                        class="text-red-600 hover:text-red-900 text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded border border-red-200">
+                                                    💳 Reject
+                                                </button>
+                                            </div>
                                         @endif
                                     </div>
                                 </td>
@@ -645,18 +952,55 @@ new class extends Component {
                         @endif
 
                         <!-- Action Buttons -->
-                        <div class="flex flex-wrap gap-2">
-                            @if($customerData)
-                                <button wire:click="viewCustomerDetails({{ $transactionData['id'] }})" 
-                                        class="flex-1 sm:flex-none text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-2 rounded-md font-medium">
-                                    👤 Customer
-                                </button>
+                        <div class="space-y-3">
+                            <!-- View Actions -->
+                            <div class="flex flex-wrap gap-2">
+                                @if($customerData)
+                                    <button wire:click="viewCustomerDetails({{ $transactionData['id'] }})" 
+                                            class="flex-1 sm:flex-none text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-2 rounded-md font-medium">
+                                        👤 Customer
+                                    </button>
+                                @endif
+                                @if($paymentData)
+                                    <button wire:click="viewPaymentDetails({{ $transactionData['id'] }})" 
+                                            class="flex-1 sm:flex-none text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-md font-medium">
+                                        💳 Payment
+                                    </button>
+                                @endif
+                            </div>
+                            
+                            <!-- Transaction Approval Actions -->
+                            @if(($transactionData['transaction_status'] ?? '') === 'pending')
+                                <div>
+                                    <div class="text-xs text-gray-600 mb-2 font-medium">Transaction Approval</div>
+                                    <div class="flex gap-2">
+                                        <button wire:click="showApprovalConfirmation('transaction_approve', {{ $transactionData['id'] }})" 
+                                                class="flex-1 text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-md font-medium border border-green-200">
+                                            ✓ Approve
+                                        </button>
+                                        <button wire:click="showApprovalConfirmation('transaction_reject', {{ $transactionData['id'] }})" 
+                                                class="flex-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-md font-medium border border-red-200">
+                                            ✗ Reject
+                                        </button>
+                                    </div>
+                                </div>
                             @endif
-                            @if($paymentData)
-                                <button wire:click="viewPaymentDetails({{ $transactionData['id'] }})" 
-                                        class="flex-1 sm:flex-none text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-md font-medium">
-                                    💳 Payment
-                                </button>
+                            
+                            <!-- Payment Approval Actions -->
+                            @if($paymentData && ($paymentData['payment_status'] ?? '') === 'pending')
+                                <div>
+                                    <div class="text-xs text-gray-600 mb-2 font-medium">Payment Approval</div>
+                                    <div class="flex gap-2">
+                                        <button wire:click="showApprovalConfirmation('payment_approve', {{ $transactionData['id'] }})" 
+                                                class="flex-1 text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-md font-medium border border-green-200">
+                                            💳 Approve
+                                        </button>
+                                        <button wire:click="showApprovalConfirmation('payment_reject', {{ $transactionData['id'] }})" 
+                                                class="flex-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-md font-medium border border-red-200">
+                                            💳 Reject
+                                        </button>
+                                    </div>
+                                </div>
                             @endif
                         </div>
                     </div>
@@ -732,7 +1076,7 @@ new class extends Component {
 
     <!-- Customer Details Modal -->
     @if($showCustomerModal && $selectedCustomerData)
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="closeModals">
+        <div class="fixed inset-0  bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50" wire:click="closeModals">
             <div class="relative top-4 sm:top-20 mx-auto p-3 sm:p-5 border w-11/12 sm:w-10/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white" wire:click.stop>
                 <div class="mt-1 sm:mt-3">
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
@@ -849,7 +1193,7 @@ new class extends Component {
 
     <!-- Payment Details Modal -->
     @if($showPaymentModal && $selectedPaymentData)
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" wire:click="closeModals">
+        <div class="fixed inset-0 bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50" wire:click="closeModals">
             <div class="relative top-4 sm:top-20 mx-auto p-3 sm:p-5 border w-11/12 sm:w-10/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white" wire:click.stop>
                 <div class="mt-1 sm:mt-3">
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
@@ -911,6 +1255,91 @@ new class extends Component {
                             <p class="mt-1 text-xs sm:text-sm text-gray-900">{{ $selectedPaymentData['description'] }}</p>
                         </div>
                     @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Approval Confirmation Modal -->
+    @if($showApprovalModal)
+        <div class="fixed inset-0  bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50" wire:click="closeModals">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white" wire:click.stop>
+                <div class="mt-3 text-center">
+                    <!-- Modal Icon -->
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full {{ $approvalType === 'transaction_approve' || $approvalType === 'payment_approve' ? 'bg-green-100' : 'bg-red-100' }}">
+                        @if($approvalType === 'transaction_approve' || $approvalType === 'payment_approve')
+                            <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        @else
+                            <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        @endif
+                    </div>
+                    
+                    <!-- Modal Title -->
+                    <h3 class="text-lg font-medium text-gray-900 mt-4">
+                        @if($approvalType === 'transaction_approve')
+                            Approve Transaction
+                        @elseif($approvalType === 'transaction_reject')
+                            Reject Transaction
+                        @elseif($approvalType === 'payment_approve')
+                            Approve Payment
+                        @elseif($approvalType === 'payment_reject')
+                            Reject Payment
+                        @endif
+                    </h3>
+                    
+                    <!-- Modal Content -->
+                    <div class="mt-4 px-7 py-3">
+                        <p class="text-sm text-gray-500">
+                            @if($approvalType === 'transaction_approve')
+                                Are you sure you want to approve this transaction? This action cannot be undone.
+                            @elseif($approvalType === 'transaction_reject')
+                                Are you sure you want to reject this transaction? This action cannot be undone.
+                            @elseif($approvalType === 'payment_approve')
+                                Are you sure you want to approve this payment? This action cannot be undone.
+                            @elseif($approvalType === 'payment_reject')
+                                Are you sure you want to reject this payment? This action cannot be undone.
+                            @endif
+                        </p>
+                        
+                        @if($approvalTransactionData)
+                            <div class="mt-4 p-3 bg-gray-50 rounded-md text-left">
+                                <div class="text-xs text-gray-600">
+                                    <div><strong>Transaction ID:</strong> {{ $approvalTransactionData['id'] }}</div>
+                                    <div><strong>Amount:</strong> {{ number_format($approvalTransactionData['amount'] ?? 0, 2) }}</div>
+                                    <div><strong>Service:</strong> {{ $approvalTransactionData['service']['name'] ?? 'N/A' }}</div>
+                                    @if(isset($approvalTransactionData['payment_detail']))
+                                        <div><strong>Payment Method:</strong> {{ $approvalTransactionData['payment_detail']['payment_method'] ?? 'N/A' }}</div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                    
+                    <!-- Modal Actions -->
+                    <div class="items-center px-4 py-3">
+                        <div class="flex gap-3 justify-center">
+                            <button wire:click="closeModals" 
+                                    class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                                Cancel
+                            </button>
+                            <button wire:click="confirmApproval" 
+                                    class="px-4 py-2 {{ $approvalType === 'transaction_approve' || $approvalType === 'payment_approve' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white' }} text-base font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 {{ $approvalType === 'transaction_approve' || $approvalType === 'payment_approve' ? 'focus:ring-green-500' : 'focus:ring-red-500' }}">
+                                @if($approvalType === 'transaction_approve')
+                                    ✓ Approve Transaction
+                                @elseif($approvalType === 'transaction_reject')
+                                    ✗ Reject Transaction
+                                @elseif($approvalType === 'payment_approve')
+                                    💳 Approve Payment
+                                @elseif($approvalType === 'payment_reject')
+                                    💳 Reject Payment
+                                @endif
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

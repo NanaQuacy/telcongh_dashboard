@@ -166,4 +166,34 @@ class DashboardController extends Controller
 
         return view('dashboard.users');
     }
+
+    /**
+     * Download temporary file
+     */
+    public function downloadTemp($filename)
+    {
+        if (!$this->checkAuthService->checkAuth()) {
+            return redirect('/login');
+        }
+
+        $filePath = storage_path('app/temp/' . $filename);
+        
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found');
+        }
+
+        // Determine content type based on file extension
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $contentType = match($extension) {
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'pdf' => 'application/pdf',
+            'csv' => 'text/csv',
+            default => 'application/octet-stream'
+        };
+
+        // Download and delete the file
+        return response()->download($filePath, $filename, [
+            'Content-Type' => $contentType,
+        ])->deleteFileAfterSend(true);
+    }
 }
